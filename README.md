@@ -152,62 +152,121 @@ data/           Generated database (gitignored)
 
 Topics span: `fabric/*`, `purview/*`, `data-engineering/*`, `ai-engineering/*`, and `patterns/*`. See `config/settings.py` for the full keyword mapping.
 
-## Deployment
+## Deployment (Podman / Docker)
 
-The `Dockerfile` bakes the embedding model and `knowledge.db` into the image so there are no runtime downloads or external dependencies.
+The image bakes in the embedding model and code but **not** the database or content. Data lives on named volumes so it persists across container rebuilds, bug fixes, and feature updates.
 
-### Prerequisites
-
-- **Podman** (or Docker) installed locally
-- Ingestion already run so `data/knowledge.db` exists
-- For Azure: an Azure Container Registry (ACR) and Azure Container Apps resource
-
-### Build and test locally
+### 1. Build the image
 
 ```bash
-# Build the image (uses Podman; substitute `docker` if needed)
 podman build -t ms-knowledge-base .
+```
 
-# Run locally — no auth, SSE on port 3200
-podman run -p 3200:3200 ms-knowledge-base \
-    python -m ms_knowledge_base.server.main \
-    --transport sse --host 0.0.0.0 --port 3200 --auth none
+### 2. Create named volumes
 
-# Run with API key auth
-podman run -p 3200:3200 ms-knowledge-base \
+```bash
+podman volume create mskb-data     # knowledge.db lives here
+podman volume create mskb-content  # source PDFs live here
+```
+
+### 3. Add content to the volume
+
+Copy PDFs into the content volume from your host:
+
+```bash
+# Copy a single file
+podman run --rm -v mskb-content:/app/content \
+    -v "/c/Users/Troy Scott/projects/ms-knowledge-base/content":/src:ro \
+    busybox cp -r /src/. /app/content/
+
+# Or bind-mount your host content directory directly (simpler for local dev)
+# See the ingestion step below
+```
+
+### 4. Run ingestion
+
+Ingest PDFs into the knowledge base. This writes `knowledge.db` into the data volume:
+
+```bash
+podman run --rm \
+    -v mskb-data:/app/data \
+    -v mskb-content:/app/content \
+    ms-knowledge-base \
+    python scripts/ingest.py --dir /app/content
+```
+
+Or bind-mount your host directories directly:
+
+```bash
+podman run --rm \
+    -v mskb-data:/app/data \
+    -v "/c/Users/Troy Scott/projects/ms-knowledge-base/content":/app/content:ro \
+    ms-knowledge-base \
+    python scripts/ingest.py --dir /app/content
+```
+
+Check stats:
+
+```bash
+podman run --rm -v mskb-data:/app/data ms-knowledge-base \
+    python scripts/ingest.py --stats
+```
+
+### 5. Run the server
+
+```bash
+# No auth (local dev)
+podman run -d --name mskb \
+    -p 3200:3200 \
+    -v mskb-data:/app/data:ro \
+    ms-knowledge-base
+
+# With API key auth
+podman run -d --name mskb \
+    -p 3200:3200 \
+    -v mskb-data:/app/data:ro \
+    ms-knowledge-base \
     python -m ms_knowledge_base.server.main \
     --transport sse --host 0.0.0.0 --port 3200 \
     --auth apikey --auth-token "your-secret-key"
 ```
 
-### Push to Azure Container Registry
+### Updating the knowledge base
+
+No rebuild needed — just re-run ingestion against the same volumes:
+
+1. Add new PDFs to `mskb-content` (or bind-mount from host)
+2. Run the ingestion container (step 4 above) — unchanged files are skipped automatically
+3. Restart the server container: `podman restart mskb`
+
+### Rebuilding after code changes
 
 ```bash
-# Tag for your ACR
-podman tag ms-knowledge-base your-acr.azurecr.io/ms-knowledge-base:latest
+podman build -t ms-knowledge-base .
+podman stop mskb && podman rm mskb
+# Re-run server (step 5) — data volume is untouched
+```
 
-# Login to ACR
+### Azure Container Apps
+
+For Azure deployment, bake the database into a production image so the container is self-contained:
+
+```bash
+# Build a production image with DB included
+podman run --rm -v mskb-data:/app/data ms-knowledge-base \
+    cat /app/data/knowledge.db > knowledge-export.db
+
+# Use a Dockerfile.prod that COPYs knowledge-export.db into the image
+podman build -f Dockerfile.prod -t ms-knowledge-base:prod .
+
+# Push to ACR
+podman tag ms-knowledge-base:prod your-acr.azurecr.io/ms-knowledge-base:latest
 podman login your-acr.azurecr.io
-
-# Push
 podman push your-acr.azurecr.io/ms-knowledge-base:latest
 ```
 
-### Deploy to Azure Container Apps
-
-After pushing to ACR, create or update a Container App that pulls from the registry. The default `CMD` in the Dockerfile starts the server with Entra ID auth:
+Override auth settings in the Container App configuration:
 
 ```
-python -m ms_knowledge_base.server.main --transport sse --host 0.0.0.0 --port 3200 --auth entra
+python -m ms_knowledge_base.server.main --transport sse --host 0.0.0.0 --port 3200 --auth entra --tenant-id YOUR_TENANT --client-id YOUR_CLIENT
 ```
-
-Override `--tenant-id` and `--client-id` via environment variables or command args in the Container App configuration.
-
-### Updating the knowledge base
-
-Content updates follow this cycle:
-
-1. Add/update PDFs in `content/` on the Beelink
-2. Re-run ingestion: `python scripts/ingest.py --dir content/`
-3. Rebuild the image: `podman build -t ms-knowledge-base .`
-4. Push to ACR and redeploy the Container App
