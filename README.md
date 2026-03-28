@@ -62,6 +62,67 @@ python -m ms_knowledge_base.server.main --transport sse --auth apikey --auth-tok
 python -m pytest tests/ -v
 ```
 
+## Claude Desktop
+
+### Option A: Local (stdio)
+
+The simplest setup — Claude Desktop launches the MCP server as a subprocess. Add this to your `claude_desktop_config.json`:
+
+```jsonc
+{
+  "mcpServers": {
+    "ms-knowledge-base": {
+      "command": "python",
+      "args": ["-m", "ms_knowledge_base.server.main", "--transport", "stdio"],
+      "cwd": "C:\\Users\\Troy Scott\\ms-knowledge-base"
+    }
+  }
+}
+```
+
+Adjust `cwd` to match your install path. The server loads the embedding model on startup (~5-10s), then Claude Desktop can call `search_kb`, `list_topics`, `get_chunk_context`, and `get_source_info`.
+
+### Option B: Remote via Tailscale (SSE)
+
+Access the MCP server from Claude Desktop on a different machine over your Tailscale network. Two approaches:
+
+**Tailscale Serve** (tailnet-only, private to your Tailscale network):
+
+```bash
+# On the host machine — start the MCP server
+python -m ms_knowledge_base.server.main --transport sse --host 0.0.0.0 --port 3200
+
+# Expose port 3200 via Tailscale Serve (accessible only within your tailnet)
+tailscale serve --bg 3200
+```
+
+**Tailscale Funnel** (publicly reachable over HTTPS — use with caution):
+
+```bash
+# On the host machine — start the MCP server
+python -m ms_knowledge_base.server.main --transport sse --host 0.0.0.0 --port 3200
+
+# Expose port 3200 via Tailscale Funnel (publicly reachable)
+tailscale funnel 3200
+```
+
+Then configure Claude Desktop on the remote machine to connect via `mcp-remote`:
+
+```jsonc
+{
+  "mcpServers": {
+    "ms-knowledge-base": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://tulip.boga-vernier.ts.net/sse"]
+    }
+  }
+}
+```
+
+Replace `tulip.boga-vernier.ts.net` with your machine's Tailscale hostname.
+
+> **Note:** Tailscale Serve keeps traffic within your tailnet (private). Tailscale Funnel makes the endpoint reachable from the public internet over HTTPS. If using Funnel, consider adding API key auth: `--auth apikey --auth-token YOUR_KEY`.
+
 ## Project Structure
 
 ```
