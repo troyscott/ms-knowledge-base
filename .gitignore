@@ -1,0 +1,17 @@
+content/**
+!content/**/
+!content/**/.gitkeep
+data/**
+!data/**/
+!data/**/.gitkeep
+*.db
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+.env
+dist/
+build/
+.pytest_cache/
+.claude/settings.local.json

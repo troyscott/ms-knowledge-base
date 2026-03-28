@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ms-knowledge-base"
+version = "0.1.0"
+requires-python = ">=3.11"
+description = "Local MCP server providing semantic search over curated Microsoft technical content"
+dependencies = [
+    "fastmcp>=2.0.0",
+    "sentence-transformers>=3.0.0",
+    "sqlite-vec>=0.1.0",
+    "pymupdf>=1.24.0",
+    "click>=8.0.0",
+]
+
+[project.optional-dependencies]
+azure = [
+    "PyJWT>=2.8.0",
+    "cryptography>=42.0.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[project.scripts]
+mskb-ingest = "ms_knowledge_base.ingest.pipeline:main"
+mskb-serve = "ms_knowledge_base.server.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
