@@ -66,7 +66,11 @@ python -m pytest tests/ -v
 
 ### Option A: Local (stdio)
 
-The simplest setup — Claude Desktop launches the MCP server as a subprocess. Add this to your `claude_desktop_config.json`:
+The simplest setup — Claude Desktop launches the MCP server as a subprocess. Add this to your `claude_desktop_config.json`.
+
+**macOS:**
+
+Config location: `~/Library/Application Support/Claude/claude_desktop_config.json`
 
 ```jsonc
 {
@@ -74,7 +78,23 @@ The simplest setup — Claude Desktop launches the MCP server as a subprocess. A
     "ms-knowledge-base": {
       "command": "python",
       "args": ["-m", "ms_knowledge_base.server.main", "--transport", "stdio"],
-      "cwd": "C:\\Users\\Troy Scott\\ms-knowledge-base"
+      "cwd": "/Users/yourname/projects/ms-knowledge-base"
+    }
+  }
+}
+```
+
+**Windows 11:**
+
+Config location: `%APPDATA%\Claude\claude_desktop_config.json`
+
+```jsonc
+{
+  "mcpServers": {
+    "ms-knowledge-base": {
+      "command": "python",
+      "args": ["-m", "ms_knowledge_base.server.main", "--transport", "stdio"],
+      "cwd": "C:\\Users\\YourName\\projects\\ms-knowledge-base"
     }
   }
 }
@@ -113,13 +133,13 @@ Then configure Claude Desktop on the remote machine to connect via `mcp-remote`:
   "mcpServers": {
     "ms-knowledge-base": {
       "command": "npx",
-      "args": ["mcp-remote", "https://tulip.boga-vernier.ts.net/sse"]
+      "args": ["mcp-remote", "https://lotus.boga-vernier.ts.net/sse"]
     }
   }
 }
 ```
 
-Replace `tulip.boga-vernier.ts.net` with your machine's Tailscale hostname.
+Replace `lotus.boga-vernier.ts.net` with your machine's Tailscale hostname.
 
 > **Note:** Tailscale Serve keeps traffic within your tailnet (private). Tailscale Funnel makes the endpoint reachable from the public internet over HTTPS. If using Funnel, consider adding API key auth: `--auth apikey --auth-token YOUR_KEY`.
 
@@ -147,6 +167,28 @@ data/           Generated database (gitignored)
 | Keyword search | SQLite FTS5 |
 | MCP framework | FastMCP |
 | Auth | API key / Microsoft Entra ID (JWT) |
+
+## Troubleshooting
+
+### Claude Desktop: "VM service not running"
+
+If Claude Desktop shows **"VM service not running. The service failed to start"**, the Claude Windows service hasn't started. Fix it from an admin command prompt:
+
+```
+net start Claude
+```
+
+Then relaunch Claude Desktop. This can happen after a reboot or terminal crash.
+
+### Micromamba: "Shell not initialized"
+
+If `micromamba activate podman` fails with **"Shell not initialized"**, run:
+
+```
+micromamba shell init --shell cmd.exe --root-prefix="C:\Users\Troy Scott\micromamba"
+```
+
+Then close and reopen your command prompt. The root prefix must point to where your envs actually live (`C:\Users\Troy Scott\micromamba`), not the default `%USERPROFILE%\.local\share\mamba`.
 
 ## Content Taxonomy
 

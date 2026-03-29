@@ -55,6 +55,7 @@ def main() -> None:
         "--auth", choices=["none", "apikey", "entra"], default="none",
         help="Auth mode (default: none)"
     )
+    parser.add_argument("--path", default=None, help="URL path prefix (e.g., /kb for Tailscale Funnel)")
     parser.add_argument("--auth-token", default=None, help="API key for apikey auth mode")
     parser.add_argument("--tenant-id", default=None, help="Entra ID tenant ID")
     parser.add_argument("--client-id", default=None, help="Entra ID app registration client ID")
@@ -88,7 +89,7 @@ def main() -> None:
             logger.info("Auth mode: %s", args.auth)
 
         logger.info("Starting MCP server (SSE on %s:%d)", args.host, args.port)
-        server.run(transport="sse", host=args.host, port=args.port)
+        server.run(transport="sse", host=args.host, port=args.port, path=args.path)
 
 
 if __name__ == "__main__":
