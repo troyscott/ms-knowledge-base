@@ -58,17 +58,22 @@ class KBSearchEngine:
     """Hybrid search engine combining vector similarity and keyword matching."""
 
     def __init__(self, db_path: Path, embedder: Embedder) -> None:
-        self.db = sqlite3.connect(str(db_path))
-        self.db.execute("PRAGMA journal_mode=WAL")
-        self.db.execute("PRAGMA foreign_keys=ON")
-        self.db.row_factory = sqlite3.Row
-        self.db.enable_load_extension(True)
-        sqlite_vec.load(self.db)
-        self.db.enable_load_extension(False)
+        self.db_path = db_path
         self.embedder = embedder
 
+    def _get_db(self) -> sqlite3.Connection:
+        """Create a thread-local database connection."""
+        conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA foreign_keys=ON")
+        conn.row_factory = sqlite3.Row
+        conn.enable_load_extension(True)
+        sqlite_vec.load(conn)
+        conn.enable_load_extension(False)
+        return conn
+
     def close(self) -> None:
-        self.db.close()
+        pass  # connections are created and closed per-call
 
     def search(
         self,
@@ -90,7 +95,8 @@ class KBSearchEngine:
 
         # 2. Vector KNN search
         candidate_limit = max_results * CANDIDATE_MULTIPLIER
-        vector_rows = self.db.execute(
+        db = self._get_db()
+        vector_rows = db.execute(
             """SELECT chunk_id, distance
                FROM chunk_embeddings
                WHERE embedding MATCH ?
@@ -110,7 +116,7 @@ class KBSearchEngine:
         # 3. FTS keyword boost
         fts_ids: set[int] = set()
         try:
-            fts_rows = self.db.execute(
+            fts_rows = db.execute(
                 "SELECT rowid FROM chunks_fts WHERE chunks_fts MATCH ?",
                 (query,),
             ).fetchall()
@@ -122,7 +128,7 @@ class KBSearchEngine:
         # 4. Fetch chunk metadata and compute final scores
         chunk_ids = list(candidates.keys())
         placeholders = ",".join("?" * len(chunk_ids))
-        rows = self.db.execute(
+        rows = db.execute(
             f"""SELECT c.id, c.content, c.section_title, c.topic,
                        c.page_number, c.chunk_index, c.source_id,
                        s.file_path, s.source_type
@@ -170,7 +176,8 @@ class KBSearchEngine:
         self, source_file: str, chunk_index: int, window: int = 2
     ) -> list[ContextChunk]:
         """Get surrounding chunks for expanded context."""
-        rows = self.db.execute(
+        db = self._get_db()
+        rows = db.execute(
             """SELECT c.content, c.section_title, c.chunk_index, c.page_number
                FROM chunks c
                JOIN sources s ON c.source_id = s.id
@@ -193,7 +200,8 @@ class KBSearchEngine:
 
     def list_topics(self) -> list[TopicInfo]:
         """List all topics with chunk counts."""
-        rows = self.db.execute(
+        db = self._get_db()
+        rows = db.execute(
             """SELECT topic,
                       COUNT(*) as chunk_count,
                       COUNT(DISTINCT source_id) as source_count
@@ -213,19 +221,20 @@ class KBSearchEngine:
 
     def get_source_info(self, source_type: str | None = None) -> list[SourceInfo]:
         """List ingested source documents."""
+        db = self._get_db()
         if source_type:
-            rows = self.db.execute(
+            rows = db.execute(
                 "SELECT * FROM sources WHERE source_type = ? ORDER BY ingested_at DESC",
                 (source_type,),
             ).fetchall()
         else:
-            rows = self.db.execute(
+            rows = db.execute(
                 "SELECT * FROM sources ORDER BY ingested_at DESC"
             ).fetchall()
 
         results: list[SourceInfo] = []
         for row in rows:
-            topics_rows = self.db.execute(
+            topics_rows = db.execute(
                 "SELECT DISTINCT topic FROM chunks WHERE source_id = ? ORDER BY topic",
                 (row["id"],),
             ).fetchall()

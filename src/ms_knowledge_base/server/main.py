@@ -23,7 +23,7 @@ def create_server(db_path: Path, embedder: Embedder) -> FastMCP:
     """Create and configure the MCP server."""
     mcp = FastMCP(
         "Microsoft Knowledge Base",
-        description=(
+        instructions=(
             "Semantic search over curated Microsoft Fabric, "
             "Data Engineering, and AI Engineering content."
         ),
