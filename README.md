@@ -137,10 +137,10 @@ Then configure Claude Desktop on the remote machine to connect via `mcp-remote` 
       "args": [
         "-y", "mcp-remote",
         "https://lotus.boga-vernier.ts.net/sse",
-        "--header", "Authorization:Bearer ${MCP_API_KEY}"
+        "--header", "Authorization:${AUTH_HEADER}"
       ],
       "env": {
-        "MCP_API_KEY": "YOUR_SECRET_KEY"
+        "AUTH_HEADER": "Bearer YOUR_SECRET_KEY"
       }
     }
   }
@@ -148,6 +148,8 @@ Then configure Claude Desktop on the remote machine to connect via `mcp-remote` 
 ```
 
 Replace `lotus.boga-vernier.ts.net` with your machine's Tailscale hostname and `YOUR_SECRET_KEY` with your chosen API key.
+
+> **Why use `env`?** On Windows, spaces in `args` values can get split during argument parsing. Putting `Bearer <key>` in an environment variable avoids this issue.
 
 > **Note:** Tailscale Serve keeps traffic within your tailnet (private). Tailscale Funnel makes the endpoint reachable from the public internet over HTTPS. Always use `--auth apikey` when exposing via Funnel.
 
