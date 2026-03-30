@@ -58,6 +58,7 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
     "data-engineering/spark": ["apache spark", "spark sql", "spark streaming", "pyspark"],
     "ai-engineering/foundry": ["ai foundry", "azure ai foundry", "microsoft foundry", "foundry portal", "model deployment", "model catalog"],
     "ai-engineering/foundry/agents": ["foundry agent", "agent service", "hosted agent", "prompt agent"],
+    "ai-engineering/foundry/content-understanding": ["content understanding", "analyzer", "document processing", "prebuilt analyzer", "custom analyzer"],
     "ai-engineering/foundry/iq": ["foundry iq", "knowledge base agent", "enterprise knowledge", "connect knowledge base"],
     "ai-engineering/foundry/rag": ["retrieval augmented generation", "rag", "vector store", "file search", "grounding"],
     "ai-engineering/ai-skills": ["ai skill", "fabric ai skill"],
