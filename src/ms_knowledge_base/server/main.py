@@ -6,20 +6,23 @@ import sys
 from pathlib import Path
 
 from fastmcp import FastMCP
+from fastmcp.server.auth.auth import TokenVerifier
 
 # Import settings
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent / "config"))
 from settings import DB_PATH, EMBEDDING_MODEL, SSE_DEFAULT_HOST, SSE_DEFAULT_PORT
 
 from ms_knowledge_base.ingest.embedder import Embedder
-from ms_knowledge_base.server.auth import create_auth_middleware
+from ms_knowledge_base.server.auth import create_auth_provider
 from ms_knowledge_base.server.search import KBSearchEngine
 from ms_knowledge_base.server.tools import register_tools
 
 logger = logging.getLogger(__name__)
 
 
-def create_server(db_path: Path, embedder: Embedder) -> FastMCP:
+def create_server(
+    db_path: Path, embedder: Embedder, auth: TokenVerifier | None = None
+) -> FastMCP:
     """Create and configure the MCP server."""
     mcp = FastMCP(
         "Microsoft Knowledge Base",
@@ -27,6 +30,7 @@ def create_server(db_path: Path, embedder: Embedder) -> FastMCP:
             "Semantic search over curated Microsoft Fabric, "
             "Data Engineering, and AI Engineering content."
         ),
+        auth=auth,
     )
 
     engine = KBSearchEngine(db_path, embedder)
@@ -70,24 +74,24 @@ def main() -> None:
     embedder = Embedder(EMBEDDING_MODEL)
     logger.info("Model loaded.")
 
+    # Create auth provider
+    auth = create_auth_provider(
+        mode=args.auth,
+        api_key=args.auth_token,
+        tenant_id=args.tenant_id,
+        client_id=args.client_id,
+    )
+
+    if auth:
+        logger.info("Auth mode: %s", args.auth)
+
     # Create server
-    server = create_server(args.db, embedder)
+    server = create_server(args.db, embedder, auth=auth)
 
     if args.transport == "stdio":
         logger.info("Starting MCP server (stdio transport)")
         server.run(transport="stdio")
     else:
-        # SSE transport
-        auth_middleware = create_auth_middleware(
-            mode=args.auth,
-            api_key=args.auth_token,
-            tenant_id=args.tenant_id,
-            client_id=args.client_id,
-        )
-
-        if auth_middleware:
-            logger.info("Auth mode: %s", args.auth)
-
         logger.info("Starting MCP server (SSE on %s:%d)", args.host, args.port)
         server.run(transport="sse", host=args.host, port=args.port, path=args.path)
 

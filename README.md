@@ -116,32 +116,40 @@ python -m ms_knowledge_base.server.main --transport sse --host 0.0.0.0 --port 32
 tailscale serve --bg 3200
 ```
 
-**Tailscale Funnel** (publicly reachable over HTTPS — use with caution):
+**Tailscale Funnel** (publicly reachable over HTTPS — use with API key auth):
 
 ```bash
-# On the host machine — start the MCP server
-python -m ms_knowledge_base.server.main --transport sse --host 0.0.0.0 --port 3200
+# On the host machine — start the MCP server with auth
+python -m ms_knowledge_base.server.main --transport sse --host 0.0.0.0 --port 3200 \
+    --auth apikey --auth-token YOUR_SECRET_KEY
 
 # Expose port 3200 via Tailscale Funnel (publicly reachable)
 tailscale funnel 3200
 ```
 
-Then configure Claude Desktop on the remote machine to connect via `mcp-remote`:
+Then configure Claude Desktop on the remote machine to connect via `mcp-remote` with the auth header:
 
 ```jsonc
 {
   "mcpServers": {
     "ms-knowledge-base": {
       "command": "npx",
-      "args": ["mcp-remote", "https://lotus.boga-vernier.ts.net/sse"]
+      "args": [
+        "-y", "mcp-remote",
+        "https://lotus.boga-vernier.ts.net/sse",
+        "--header", "Authorization:Bearer ${MCP_API_KEY}"
+      ],
+      "env": {
+        "MCP_API_KEY": "YOUR_SECRET_KEY"
+      }
     }
   }
 }
 ```
 
-Replace `lotus.boga-vernier.ts.net` with your machine's Tailscale hostname.
+Replace `lotus.boga-vernier.ts.net` with your machine's Tailscale hostname and `YOUR_SECRET_KEY` with your chosen API key.
 
-> **Note:** Tailscale Serve keeps traffic within your tailnet (private). Tailscale Funnel makes the endpoint reachable from the public internet over HTTPS. If using Funnel, consider adding API key auth: `--auth apikey --auth-token YOUR_KEY`.
+> **Note:** Tailscale Serve keeps traffic within your tailnet (private). Tailscale Funnel makes the endpoint reachable from the public internet over HTTPS. Always use `--auth apikey` when exposing via Funnel.
 
 ## Project Structure
 

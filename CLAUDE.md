@@ -38,6 +38,13 @@ python -m ms_knowledge_base.server.main --transport stdio
 
 # Start MCP server (SSE for remote/network access)
 python -m ms_knowledge_base.server.main --transport sse --port 3200
+
+# Start MCP server with API key auth (required for Tailscale Funnel)
+python -m ms_knowledge_base.server.main --transport sse --port 3200 --auth apikey --auth-token YOUR_KEY
+
+# Split a large PDF before ingesting
+python scripts/split_pdf.py --file content/large-doc.pdf --dry-run
+python scripts/split_pdf.py --file content/large-doc.pdf --skip-api-ref --delete-original
 ```
 
 ## Architecture
