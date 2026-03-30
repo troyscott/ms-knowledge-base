@@ -69,8 +69,10 @@ def main(
 def _print_result(result) -> None:
     """Print a single ingestion result."""
     status = "created" if result.chunks_created > 0 else "skipped"
+    # Replace non-ASCII chars to avoid cp1252 encoding errors on Windows
+    name = result.file_path.name.encode("ascii", errors="replace").decode("ascii")
     click.echo(
-        f"  {result.file_path.name}: {result.chunks_created} chunks {status}"
+        f"  {name}: {result.chunks_created} chunks {status}"
         f" | type={result.source_type}"
         f" | topics={result.topics_found}"
     )
